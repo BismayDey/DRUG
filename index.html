@@ -29,36 +29,45 @@
         <button type="submit">Add Drug</button>
       </form>
 
+      <h2>Search Drugs</h2>
+      <input
+        type="text"
+        id="search-input"
+        placeholder="Search by name or type"
+      />
+
+      <h3>Sort Drugs</h3>
+      <select id="sort-select">
+        <option value="name">Name</option>
+        <option value="type">Type</option>
+        <option value="quantity">Quantity</option>
+      </select>
+
       <h2>Drug Inventory</h2>
       <p id="inventory">Total Inventory: 0 units</p>
 
       <h3>Drug List</h3>
-      <ul id="imported-list">
-        <!-- List of imported drugs will appear here -->
-      </ul>
+      <ul id="imported-list"></ul>
 
       <h3>Drugs Table</h3>
-      <table id="drug-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Quantity</th>
-            <th>Expiry</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- Drugs will be dynamically inserted here -->
-        </tbody>
-      </table>
+      <div id="table-container">
+        <table id="drug-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Quantity</th>
+              <th>Expiry</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <button id="restore-button">Restore Last Deleted Drug</button>
+      <button id="print-button">Print Receipt</button>
     </main>
 
-    <footer>
-      <p>&copy; 2024 Drug Inventory System</p>
-    </footer>
-
-    <!-- Firebase and custom script -->
     <script type="module" src="script.js"></script>
   </body>
 </html>
