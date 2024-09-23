@@ -228,28 +228,53 @@ restoreButton.addEventListener("click", () => {
   }
 });
 
-// Print Receipt functionality
 printButton.addEventListener("click", () => {
-  const printContent = document.getElementById("drug-table").outerHTML;
-  const printWindow = window.open("", "", "width=600,height=400");
-  printWindow.document.write(`
-        <html>
-            <head>
-                <title>Receipt</title>
-                <style>
-                    body { font-family: Arial; }
-                    table { width: 100%; border-collapse: collapse; }
-                    th, td { border: 1px solid #ddd; padding: 8px; }
-                    th { background-color: #4caf50; color: white; }
-                </style>
-            </head>
-            <body>${printContent}</body>
-        </html>
-    `);
+  const printContent = `
+      <html>
+          <head>
+              <title>Receipt</title>
+              <style>
+                  body { font-family: Arial; }
+                  table { width: 100%; border-collapse: collapse; }
+                  th, td { border: 1px solid #ddd; padding: 8px; }
+                  th { background-color: #009688; color: white; }
+                  h2 { text-align: center; }
+              </style>
+          </head>
+          <body>
+              <h2>Drug Inventory Receipt</h2>
+              <p>${inventoryDisplay.textContent}</p>
+              <table>
+                  <thead>
+                      <tr>
+                          <th>Name</th>
+                          <th>Type</th>
+                          <th>Quantity</th>
+                          <th>Expiry</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      ${Array.from(drugTableBody.querySelectorAll("tr"))
+                        .map(
+                          (row) => `
+                          <tr>
+                              <td>${row.children[0].textContent}</td>
+                              <td>${row.children[1].textContent}</td>
+                              <td>${row.children[2].textContent}</td>
+                              <td>${row.children[3].textContent}</td>
+                          </tr>`
+                        )
+                        .join("")}
+                  </tbody>
+              </table>
+          </body>
+      </html>
+  `;
+
+  const printWindow = window.open("", "", "width=800,height=600");
+  printWindow.document.write(printContent);
   printWindow.document.close();
-  printWindow.focus();
   printWindow.print();
-  printWindow.close();
 });
 
 // Search functionality
