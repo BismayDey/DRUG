@@ -1,5 +1,5 @@
 // Import Firebase functions
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.3.0/firebase-app.js";
 import {
   getDatabase,
   ref,
@@ -7,11 +7,12 @@ import {
   push,
   onValue,
   remove,
-} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-database.js";
+  update,
+} from "https://www.gstatic.com/firebasejs/10.3.0/firebase-database.js";
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyC_OV9rMI-E0EcI5JxF9KAOFeXoX4rzjVo",
+  apiKey: "IzaSyC_OV9rMI-E0EcI5JxF9KAOFeXoX4rzjVo",
   authDomain: "drug-bf6b3.firebaseapp.com",
   databaseURL: "https://drug-bf6b3-default-rtdb.firebaseio.com/",
   projectId: "drug-bf6b3",
@@ -36,6 +37,7 @@ const restoreButton = document.getElementById("restore-button");
 const sortSelect = document.getElementById("sort-select");
 let totalInventory = 0;
 let lastDeletedDrug = null;
+let lastDeletedDrugId = null; // Store deleted drug's ID
 
 // Function to check if the drug is expired
 function isExpired(expiryDate) {
@@ -58,6 +60,9 @@ function addDrugToTable(id, drug) {
     newRow.classList.add("expired");
     drug.quantity = 0; // Don't add expired drugs to total inventory
   }
+
+  // Skip inactive drugs
+  if (!drug.is_active) return;
 
   newRow.innerHTML = `
         <td>${drug.name}</td>
@@ -94,27 +99,28 @@ function sortDrugs() {
   rows.forEach((row) => drugTableBody.appendChild(row));
 }
 
-// Listen for real-time updates and add drugs to the table
-const drugsRef = ref(db, "drugs");
-onValue(drugsRef, (snapshot) => {
-  drugTableBody.innerHTML = ""; // Clear the table body
-  importedList.innerHTML = ""; // Clear the imported list
-  totalInventory = 0; // Reset total inventory
+// Fetch and display the drug list (This refreshes UI)
+function fetchAndDisplayDrugs() {
+  onValue(ref(db, "drugs"), (snapshot) => {
+    drugTableBody.innerHTML = ""; // Clear the table body
+    importedList.innerHTML = ""; // Clear the imported list
+    totalInventory = 0; // Reset total inventory
 
-  snapshot.forEach((childSnapshot) => {
-    const drug = childSnapshot.val();
-    addDrugToTable(childSnapshot.key, drug);
+    snapshot.forEach((childSnapshot) => {
+      const drug = childSnapshot.val();
+      addDrugToTable(childSnapshot.key, drug);
 
-    // Only add to total inventory if it's not expired
-    if (!isExpired(drug.expiry)) {
-      totalInventory += drug.quantity;
-    }
+      // Only add to total inventory if it's not expired and active
+      if (!isExpired(drug.expiry) && drug.is_active) {
+        totalInventory += drug.quantity;
+      }
+    });
+
+    // Update inventory display
+    updateInventoryDisplay();
+    sortDrugs(); // Sort the drugs after loading
   });
-
-  // Update inventory display
-  updateInventoryDisplay();
-  sortDrugs(); // Sort the drugs after loading
-});
+}
 
 // Add new drug to Realtime Database
 drugForm.addEventListener("submit", function (e) {
@@ -139,13 +145,15 @@ drugForm.addEventListener("submit", function (e) {
         if (drug.name === drugName && drug.type === drugType) {
           drugExists = true;
           const newQuantity = drug.quantity + drugQuantity;
-          set(ref(db, `drugs/${childSnapshot.key}`), {
+          update(ref(db, `drugs/${childSnapshot.key}`), {
             ...drug,
             quantity: newQuantity,
+            is_active: true, // Reactivate the drug if it was inactive
           }).then(() => {
             totalInventory += drugQuantity;
             updateInventoryDisplay();
             drugForm.reset();
+            fetchAndDisplayDrugs(); // Refresh UI after adding a drug
           });
         }
       });
@@ -157,10 +165,12 @@ drugForm.addEventListener("submit", function (e) {
           type: drugType,
           quantity: drugQuantity,
           expiry: drugExpiry,
+          is_active: true, // Mark as active by default
         }).then(() => {
           totalInventory += drugQuantity;
           updateInventoryDisplay();
           drugForm.reset();
+          fetchAndDisplayDrugs(); // Refresh UI after adding a drug
         });
       }
     },
@@ -168,7 +178,7 @@ drugForm.addEventListener("submit", function (e) {
   );
 });
 
-// Delete drug from Realtime Database
+// Delete drug from Realtime Database (Soft Delete)
 drugTableBody.addEventListener("click", function (e) {
   if (e.target.classList.contains("delete-button")) {
     const id = e.target.getAttribute("data-id");
@@ -176,17 +186,20 @@ drugTableBody.addEventListener("click", function (e) {
   }
 });
 
-// Delete function
+// Soft Delete function (Mark drug as inactive)
 function deleteDrug(id, button) {
   const drugRef = ref(db, `drugs/${id}`);
   onValue(drugRef, (snapshot) => {
     lastDeletedDrug = snapshot.val(); // Store last deleted drug
+    lastDeletedDrugId = id; // Store drug's ID
   });
-  remove(drugRef).then(() => {
+
+  update(drugRef, { is_active: false }).then(() => {
     const row = button.closest("tr");
     row.classList.add("fade-out");
     row.addEventListener("animationend", () => {
       row.remove();
+      fetchAndDisplayDrugs(); // Refresh UI after deletion
     });
 
     // Adjust total inventory
@@ -199,15 +212,16 @@ function deleteDrug(id, button) {
 
 // Restore last deleted drug
 restoreButton.addEventListener("click", () => {
-  if (lastDeletedDrug) {
-    const newDrugRef = push(ref(db, "drugs"));
-    set(newDrugRef, lastDeletedDrug).then(() => {
+  if (lastDeletedDrug && lastDeletedDrugId) {
+    const drugRef = ref(db, `drugs/${lastDeletedDrugId}`);
+    update(drugRef, { is_active: true }).then(() => {
       if (!isExpired(lastDeletedDrug.expiry)) {
         totalInventory += lastDeletedDrug.quantity;
+        updateInventoryDisplay();
       }
-      updateInventoryDisplay();
-      addDrugToTable(newDrugRef.key, lastDeletedDrug);
       lastDeletedDrug = null; // Clear last deleted
+      lastDeletedDrugId = null; // Clear last deleted ID
+      fetchAndDisplayDrugs(); // Refresh UI after restore
     });
   } else {
     alert("No drug to restore!");
@@ -229,34 +243,31 @@ printButton.addEventListener("click", () => {
                     th { background-color: #4caf50; color: white; }
                 </style>
             </head>
-            <body>
-                <h2>Drug Inventory Receipt</h2>
-                <p>${inventoryDisplay.textContent}</p>
-                ${printContent}
-            </body>
+            <body>${printContent}</body>
         </html>
     `);
   printWindow.document.close();
+  printWindow.focus();
   printWindow.print();
+  printWindow.close();
 });
 
 // Search functionality
 searchInput.addEventListener("input", function () {
-  const searchTerm = searchInput.value.toLowerCase();
-  const drugRows = drugTableBody.querySelectorAll("tr");
-
-  drugRows.forEach((row) => {
-    const name = row.children[0].textContent.toLowerCase();
-    const type = row.children[1].textContent.toLowerCase();
-    if (name.includes(searchTerm) || type.includes(searchTerm)) {
-      row.style.display = ""; // Show matching row
+  const query = searchInput.value.toLowerCase();
+  const rows = drugTableBody.querySelectorAll("tr");
+  rows.forEach((row) => {
+    const drugName = row.cells[0].textContent.toLowerCase();
+    const drugType = row.cells[1].textContent.toLowerCase();
+    if (drugName.includes(query) || drugType.includes(query)) {
+      row.style.display = "";
     } else {
-      row.style.display = "none"; // Hide non-matching row
+      row.style.display = "none";
     }
   });
 });
 
-// Sort feature
+// Sort functionality
 sortSelect.addEventListener("change", function () {
   sortDrugs();
 });
@@ -274,4 +285,7 @@ function adjustTableDisplay() {
 }
 
 // Call adjustTableDisplay after each update
-onValue(drugsRef, adjustTableDisplay);
+onValue(ref(db, "drugs"), adjustTableDisplay);
+
+// Fetch and display drugs on page load
+fetchAndDisplayDrugs();
